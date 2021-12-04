@@ -21,7 +21,7 @@ import {
 import { useEventListener } from "eth-hooks/events/useEventListener";
 import { useExchangeEthPrice } from "eth-hooks/dapps/dex";
 
-// contracts
+// contracts part
 import deployedContracts from "./contracts/hardhat_contracts.json";
 import externalContracts from "./contracts/external_contracts";
 import { useContractConfig } from "./hooks";
