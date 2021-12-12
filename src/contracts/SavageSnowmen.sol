@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
@@ -10,58 +11,63 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "./rarible/royalties/contracts/impl/RoyaltiesV2Impl.sol";
-import "./rarible/royalties/contracts/LibPart.sol";
-import "./rarible/royalties/contracts/LibRoyaltiesV2.sol";
+// import "./rarible/royalties/contracts/impl/RoyaltiesV2Impl.sol";
+// import "./rarible/royalties/contracts/LibPart.sol";
+// import "./rarible/royalties/contracts/LibRoyaltiesV2.sol";
 
 contract SavageSnowmen is
     ERC721,
+    IERC2981,
     ERC721Enumerable,
     ERC721URIStorage,
     ERC721Burnable,
     Pausable,
-    Ownable,
-    RoyaltiesV2Impl
+    Ownable
 {
     using Counters for Counters.Counter;
     using SafeMath for uint256;
 
     Counters.Counter private _tokenIdCounter;
-    uint256 private _price;
-    uint96 private _percentBasisPoints;
+    uint256 public PRICE = 2500000000000000000; //2.5 avax
+    uint256 public cap;
 
     string private _tokenBaseURI;
+    bytes4 private constant _INTERFACE_ID_ERC2981 = 0x2a55205a;
 
-    address payable private _treasuryWallet;
-    address payable private _royaltiesWallet;
-
-    uint256 public _cap;
-
-    mapping(uint256 => string) public tokenIdToTokenURI;
-    mapping(uint256 => address) public tokenToMinter;
+    address payable private _proceedsPaymentsAddress;
+    address payable private _royaltiesPaymentsAddress;
+    // address payable private _treasuryWallet = payable(0x1FF0a45474f1588922aF70DE2ee78036193f289e);
+    // address payable private _artistWallet = payable(0x234cD3A5335B590872f7888d8E72DbA72492190b);
+    // address payable private _devsWallet = payable(0x1f9754318066b27EaCB747D5EB22777CA0ecC020);
+    // address payable private _phillipWallet = payable(0x4e9Bead20B8F9B8a82F8440F16E70200639E71Db);
+    // address payable private _justinWallet = payable(0x4E039B8DDb5048139e98D2bf70171BFc6d10f312);
+    
+    // LibPart.Part[] private _royalties = new LibPart.Part[](4);
 
     constructor(
         string memory name,
         string memory symbol,
         string memory tokenBaseURI,
-        uint256 mintPrice,
-        uint256 cap,
-        address payable treasuryWallet,
-        address payable royaltiesWallet
-    ) ERC721(name, symbol) {
-        _price = mintPrice;
-        _cap = cap;
+        uint256 cap_,
+        address proceedsPaymentsAddress,
+        address royaltiesPaymentAddress
+    ) ERC721(name, symbol)
+    {
+        cap = cap_;
         _tokenBaseURI = tokenBaseURI;
-        _treasuryWallet = treasuryWallet;
-        _royaltiesWallet = royaltiesWallet;
-        _percentBasisPoints = 0;
+        _proceedsPaymentsAddress = payable(proceedsPaymentsAddress);
+        _royaltiesPaymentsAddress = payable(royaltiesPaymentAddress);
+        // _royalties[0] = LibPart.Part(_treasuryWallet, 250);
+        // _royalties[1] = LibPart.Part(_artistWallet, 100);
+        // _royalties[2] = LibPart.Part(_phillipWallet, 100);
+        // _royalties[3] = LibPart.Part(_justinWallet, 100);
     }
 
-    function pause() public onlyOwner {
+    function pause() external onlyOwner {
         _pause();
     }
 
-    function unpause() public onlyOwner {
+    function unpause() external onlyOwner {
         _unpause();
     }
 
@@ -70,52 +76,55 @@ contract SavageSnowmen is
         public
         view
         virtual
-        override(ERC721, ERC721Enumerable)
+        override(ERC721, IERC165, ERC721Enumerable)
         returns (bool)
     {
-        if (interfaceId == LibRoyaltiesV2._INTERFACE_ID_ROYALTIES) {
-            return true;
-        }
-        return super.supportsInterface(interfaceId);
+        return interfaceId == _INTERFACE_ID_ERC2981 || super.supportsInterface(interfaceId);
+
+        // return interfaceId == LibRoyaltiesV2._INTERFACE_ID_ROYALTIES || super.supportsInterface(interfaceId);
     }
 
     function setBaseURI(string memory uri) external onlyOwner {
         _tokenBaseURI = uri;
     }
 
-    function setRoyaltiesWallet(address payable wallet) external onlyOwner {
-        _royaltiesWallet = wallet;
-    }
+    // function setRoyaltiesWallet(address payable wallet) external onlyOwner {
+    //     _royaltiesWallet = wallet;
+    // }
 
     function _baseURI() internal view virtual override returns (string memory) {
         return _tokenBaseURI;
     }
 
-    function tokenMinter(uint256 tokenId) public view returns (address) {
-        return tokenToMinter[tokenId];
-    }
-
-    function mint(uint256 amount) public payable whenNotPaused {
+    function mint(uint256 amount) external payable whenNotPaused {
         require(
-            msg.value == _price * amount,
+            msg.value >= PRICE.mul(amount),
             "SavageSnowmen: invalid amount sent"
         );
         require(
-            _tokenIdCounter.current() + amount <= _cap,
+            _tokenIdCounter.current().add(amount) <= cap,
             "SavageSnowmen: supply too low to mint amount"
         );
+        require(amount > 0, "Number of requested tokens has to be greater than 0");
 
         for (uint256 x = 0; x < amount; x++) {
-            _safeMint(msg.sender, _tokenIdCounter.current());
-            tokenToMinter[_tokenIdCounter.current()] = msg.sender;
-            if (_percentBasisPoints > 0) {
-                _setRoyalties(_tokenIdCounter.current());
-            }
-
             _tokenIdCounter.increment();
+            uint256 tokenId = _tokenIdCounter.current();
+
+            _safeMint(owner(), tokenId);
+
+            _transfer(owner(), msg.sender, tokenId);
+
+            // _saveRoyalties(tokenId, _royalties);
         }
 
-        payable(_treasuryWallet).transfer(msg.value);
+        // payable(_treasuryWallet).transfer(msg.value);
+    }
+
+    function withdraw() external onlyOwner {
+        require(address(this).balance > 0, "No balance");
+
+        _proceedsPaymentsAddress.transfer(address(this).balance);
     }
 
     function _beforeTokenTransfer(
@@ -143,11 +152,11 @@ contract SavageSnowmen is
     }
 
     function setPrice(uint256 mintPrice) external onlyOwner {
-        _price = mintPrice;
+        PRICE = mintPrice;
     }
 
     function price() public view returns (uint256) {
-        return _price;
+        return PRICE;
     }
 
     function tokenURI(uint256 tokenId)
@@ -156,18 +165,28 @@ contract SavageSnowmen is
         override(ERC721, ERC721URIStorage)
         returns (string memory)
     {
-        return ERC721URIStorage.tokenURI(tokenId);
+        return string(abi.encodePacked(ERC721URIStorage.tokenURI(tokenId), ".json"));
     }
 
-    function _setRoyalties(uint256 _tokenId) private {
-        LibPart.Part[] memory _royalties = new LibPart.Part[](1);
-        _royalties[0].value = _percentBasisPoints;
-        _royalties[0].account = _royaltiesWallet;
-        _saveRoyalties(_tokenId, _royalties);
+    function royaltyInfo(uint256 tokenId, uint256 salePrice)
+        external
+        view
+        override
+        returns (address receiver, uint256 royaltyAmount)
+    {
+        uint bp = 550; // 5.5% royalties in basis points
+        return (_proceedsPaymentsAddress, salePrice.mul(bp).div(10000));
     }
 
-    function setBasisPoints(uint96 value) external onlyOwner {
-        require(value <= 10000, 'SavageSnowmen: Basis Points too high');
-        _percentBasisPoints = value;
-    }
+    // function _setRoyalties(uint256 _tokenId) private {
+    //     LibPart.Part[] memory _royalties = new LibPart.Part[](1);
+    //     _royalties[0].value = _percentBasisPoints;
+    //     _royalties[0].account = _royaltiesWallet;
+    //     _saveRoyalties(_tokenId, _royalties);
+    // }
+
+    // function setBasisPoints(uint96 value) external onlyOwner {
+    //     require(value <= 10000, 'SavageSnowmen: Basis Points too high');
+    //     _percentBasisPoints = value;
+    // }
 }

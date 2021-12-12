@@ -4,3 +4,6 @@ node_modules
 build
 *privatekey*.*
 test
+
+artifacts
+cache
