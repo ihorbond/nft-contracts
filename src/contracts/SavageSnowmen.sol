@@ -11,9 +11,6 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-// import "./rarible/royalties/contracts/impl/RoyaltiesV2Impl.sol";
-// import "./rarible/royalties/contracts/LibPart.sol";
-// import "./rarible/royalties/contracts/LibRoyaltiesV2.sol";
 
 contract SavageSnowmen is
     ERC721,
@@ -36,13 +33,6 @@ contract SavageSnowmen is
 
     address payable private _proceedsPaymentsAddress;
     address payable private _royaltiesPaymentsAddress;
-    // address payable private _treasuryWallet = payable(0x1FF0a45474f1588922aF70DE2ee78036193f289e);
-    // address payable private _artistWallet = payable(0x234cD3A5335B590872f7888d8E72DbA72492190b);
-    // address payable private _devsWallet = payable(0x1f9754318066b27EaCB747D5EB22777CA0ecC020);
-    // address payable private _phillipWallet = payable(0x4e9Bead20B8F9B8a82F8440F16E70200639E71Db);
-    // address payable private _justinWallet = payable(0x4E039B8DDb5048139e98D2bf70171BFc6d10f312);
-    
-    // LibPart.Part[] private _royalties = new LibPart.Part[](4);
 
     constructor(
         string memory name,
@@ -57,10 +47,6 @@ contract SavageSnowmen is
         _tokenBaseURI = tokenBaseURI;
         _proceedsPaymentsAddress = payable(proceedsPaymentsAddress);
         _royaltiesPaymentsAddress = payable(royaltiesPaymentAddress);
-        // _royalties[0] = LibPart.Part(_treasuryWallet, 250);
-        // _royalties[1] = LibPart.Part(_artistWallet, 100);
-        // _royalties[2] = LibPart.Part(_phillipWallet, 100);
-        // _royalties[3] = LibPart.Part(_justinWallet, 100);
     }
 
     function pause() external onlyOwner {
@@ -80,8 +66,6 @@ contract SavageSnowmen is
         returns (bool)
     {
         return interfaceId == _INTERFACE_ID_ERC2981 || super.supportsInterface(interfaceId);
-
-        // return interfaceId == LibRoyaltiesV2._INTERFACE_ID_ROYALTIES || super.supportsInterface(interfaceId);
     }
 
     function setBaseURI(string memory uri) external onlyOwner {
@@ -114,11 +98,7 @@ contract SavageSnowmen is
             _safeMint(owner(), tokenId);
 
             _transfer(owner(), msg.sender, tokenId);
-
-            // _saveRoyalties(tokenId, _royalties);
         }
-
-        // payable(_treasuryWallet).transfer(msg.value);
     }
 
     function withdraw() external onlyOwner {
@@ -155,10 +135,6 @@ contract SavageSnowmen is
         PRICE = mintPrice;
     }
 
-    function price() public view returns (uint256) {
-        return PRICE;
-    }
-
     function tokenURI(uint256 tokenId)
         public
         view
@@ -177,16 +153,4 @@ contract SavageSnowmen is
         uint bp = 550; // 5.5% royalties in basis points
         return (_proceedsPaymentsAddress, salePrice.mul(bp).div(10000));
     }
-
-    // function _setRoyalties(uint256 _tokenId) private {
-    //     LibPart.Part[] memory _royalties = new LibPart.Part[](1);
-    //     _royalties[0].value = _percentBasisPoints;
-    //     _royalties[0].account = _royaltiesWallet;
-    //     _saveRoyalties(_tokenId, _royalties);
-    // }
-
-    // function setBasisPoints(uint96 value) external onlyOwner {
-    //     require(value <= 10000, 'SavageSnowmen: Basis Points too high');
-    //     _percentBasisPoints = value;
-    // }
 }
