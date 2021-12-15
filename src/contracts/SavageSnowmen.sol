@@ -151,6 +151,6 @@ contract SavageSnowmen is
         returns (address receiver, uint256 royaltyAmount)
     {
         uint bp = 550; // 5.5% royalties in basis points
-        return (_proceedsPaymentsAddress, salePrice.mul(bp).div(10000));
+        return (_royaltiesPaymentsAddress, salePrice.mul(bp).div(10000));
     }
 }
